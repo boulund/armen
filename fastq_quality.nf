@@ -11,7 +11,7 @@ params.input_reads = '' // Specify on command line
 Channel
     .fromFilePairs(params.input_reads)
     .ifEmpty{ exit 1, "Found no input reads, did you specify --input_reads? I got: '${params.input_reads}'"}
-    .into {input_reads_bbduk}
+    .into {input_reads_qa}
 
 
 process qa_reads {
@@ -19,12 +19,10 @@ process qa_reads {
     publishDir "${params.outdir}/qa_reads", mode: 'copy'
 
     input:
-    set pair_id, file(reads) from input_reads_bbduk
+    set pair_id, file(reads) from input_reads_qa
 
     output:
 	set pair_id, file("{$outfiles}.trimmed.fq.gz") into input_remove_human
-    file "${reads[0].baseName}.fq.gz" 
-    file "${reads[1].baseName}.fq.gz" 
     file "${pair_id}.stats.txt.gz"
     file "${pair_id}.bhist.txt.gz"
     file "${pair_id}.qhist.txt.gz"
@@ -71,21 +69,23 @@ process remove_human {
 	output:
 	file "${reads[0].baseName}.fq.gz"
 	file "${reads[1].baseName}.fq.gz"
-	file "${reads[0].baseName}.human.fq.gz"
+	file "${pair_id}.human.fq.gz"
+	file "${pair_id}.statsfile.txt.gz"
 
 	"""
 	bbmap.sh \
 		in1=${reads[0]} \
 		in2=${reads[1]} \
+		path=${params.human_db} \
 		outu1=${reads[0].baseName}.fq.gz \
 		outu2=${reads[1].baseName}.fq.gz \
-		outm=${reads[0].baseName}.human.fq.gz \
-		path=${params.human_seq} \
+		outm=${pair_id}.human.fq.gz \
+		statsfile=${pair_id}.statsfile.txt.gz \
 		minid=0.95 \
 		maxindel=3 \
 		minhits=2 \
-		bandwithratio=0.16 \
-		bandwith=12 \
+		bandwidthratio=0.16 \
+		bandwidth=12 \
 		quickmatch \
 		fast \
 		qtrim=rl \
