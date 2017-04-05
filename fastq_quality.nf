@@ -22,7 +22,7 @@ process qa_reads {
     set pair_id, file(reads) from input_reads_qa
 
     output:
-	set pair_id, file("{$outfiles}.trimmed.fq.gz") into input_remove_human
+	set pair_id, file("${pair_id}_{1,2}.trimmed.fq.gz") into input_remove_human
     file "${pair_id}.stats.txt.gz"
     file "${pair_id}.bhist.txt.gz"
     file "${pair_id}.qhist.txt.gz"
@@ -32,15 +32,13 @@ process qa_reads {
     file "${pair_id}.lhist.txt.gz"
     file "${pair_id}.gchist.txt.gz"
 
-	script:
-	outfiles = reads.collect{ it.baseName }.join(',')
     """
     bbduk.sh \
         in1=${reads[0]} \
         in2=${reads[1]} \
         ref=${params.bbduk_ref} \
-        out1=${reads[0].baseName}.trimmed.fq.gz \
-        out2=${reads[1].baseName}.trimmed.fq.gz \
+        out1=${pair_id}_1.trimmed.fq.gz \
+        out2=${pair_id}_2.trimmed.fq.gz \
         stats=${pair_id}.stats.txt.gz \
         bhist=${pair_id}.bhist.txt.gz \
         qhist=${pair_id}.qhist.txt.gz \
@@ -67,8 +65,8 @@ process remove_human {
 	set pair_id, file(reads) from input_remove_human
 
 	output:
-	file "${reads[0].baseName}.fq.gz"
-	file "${reads[1].baseName}.fq.gz"
+	file "${pair_id}_1.fq.gz"
+	file "${pair_id}_2.fq.gz"
 	file "${pair_id}.human.fq.gz"
 	file "${pair_id}.statsfile.txt.gz"
 
@@ -77,19 +75,20 @@ process remove_human {
 		in1=${reads[0]} \
 		in2=${reads[1]} \
 		path=${params.human_db} \
-		outu1=${reads[0].baseName}.fq.gz \
-		outu2=${reads[1].baseName}.fq.gz \
+		outu1=${pair_id}_1.fq.gz \
+		outu2=${pair_id}_2.fq.gz \
 		outm=${pair_id}.human.fq.gz \
 		statsfile=${pair_id}.statsfile.txt.gz \
-		minid=0.95 \
-		maxindel=3 \
-		minhits=2 \
-		bandwidthratio=0.16 \
-		bandwidth=12 \
-		quickmatch \
-		fast \
-		qtrim=rl \
-		trimq=10 \
-		untrim \
+		minid=${params.removehuman_minid} \
+		maxindel=${params.removehuman_maxindel} \
+		minhits=${params.removehuman_minhits} \
+		bandwidthratio=${params.removehuman_bandwidthratio} \
+		bandwidth=${params.removehuman_bandwidth} \
+		qtrim=${params.removehuman_qtrim} \
+		trimq=${params.removehuman_trimq} \
+		${params.removehuman_quickmatch} \
+		${params.removehuman_fast} \
+		${params.removehuman_untrim} \
+
 	"""
 }
