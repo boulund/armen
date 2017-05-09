@@ -103,7 +103,7 @@ def main(covstats_files, megares_annotations_file, output_file):
     print("Dataframe size is:", df.shape)
 
     # Write DataFrame to file
-    df.to_csv(output_file+".csv")
+    df.to_csv(output_file)
 
 
 if __name__ == "__main__":
