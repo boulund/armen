@@ -11,7 +11,7 @@ from collections import namedtuple
 from itertools import chain
 
 import pandas as pd
-import feather
+
 
 def parse_args():
 
@@ -20,8 +20,8 @@ def parse_args():
     parser.add_argument("COVSTATS", metavar="FILE", nargs="+",
             help="Covstats output from BBMap.")
     parser.add_argument("-a", "--annotations", 
-            default="/home/boulund/research/wellness/megares/megares_annotations_v1.01.csv",
-            help="Path to MEGARes annotations CSV file.")
+            default="/proj/b2016371/nobackup/db/MEGARes/latest/megares_annotations_v1.01.csv",
+            help="Path to MEGARes annotations CSV file [%(default)s].")
     parser.add_argument("-o", "--output", 
             default="megares_counts.csv",
             help="Output filename [%(default)s].")
@@ -41,13 +41,12 @@ def open_file(filename):
 
 
 def parse_covstats(file_handle, index_column=False):
-    """Parse BBMap covstat file contents.
+    """Parse mapped read counts from BBMap covstat file.
     """
     line = file_handle.readline()
     if not line.startswith("#"):
         raise Exception("PARSE ERROR: %s: %s", file_handle.filename, line)
 
-    counts = []
     for line in file_handle:
         splitline = line.split()
         if index_column:
@@ -76,19 +75,35 @@ def merge_columns(covstats_files, index_column, sample_columns):
 
 
 def main(covstats_files, megares_annotations_file, output_file):
+    """Main function.
 
+    Read and parse counts from BBMap covstats files.
+    Concatenate columns into Pandas DataFrame.
+    Add MEGARes annotations as DataFrame indexes.
+    Write DataFrame to file.
+    """
+
+    # Read the index column from the first file,
+    # then parse counts from all files.
     index_column_generator = parse_covstats(open_file(covstats_files[0]), index_column=True)
     sample_column_generators = [parse_covstats(open_file(covstats_file)) for covstats_file in covstats_files]
-    column_headers = list( chain(["Gene"], [parse_sample_name(covstats_file) for covstats_file in covstats_files]))
+    column_headers = list(chain(["Gene"], [parse_sample_name(covstats_file) for covstats_file in covstats_files]))
     df = pd.DataFrame(merge_columns(covstats_files,
                                     index_column_generator,
                                     sample_column_generators),
                       columns=column_headers)
 
-    df.to_csv(output_file)
-    feather.write_dataframe(df, output_file+".feather")
-    annotations = read_megares_annotations(megares_annotations_file)
+    # Append the class, group, and mechaninism annotations, 
+    # and adjust the indexes
+    megares = read_megares_annotations(megares_annotations_file)
+    df["class"] = [megares["class"][gene] for gene in df["Gene"]]
+    df["group"] = [megares["group"][gene] for gene in df["Gene"]]
+    df["mechanism"] = [megares["mechanism"][gene] for gene in df["Gene"]]
+    df.set_index(["Gene", "class", "group", "mechanism"], inplace=True)
+    print("Dataframe size is:", df.shape)
 
+    # Write DataFrame to file
+    df.to_csv(output_file+".csv")
 
 
 if __name__ == "__main__":
